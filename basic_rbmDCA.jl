@@ -181,7 +181,7 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 		
 		for i in 1:L
 			a = A_model[i]+1
-			f1[(i-1)*q+a] += scale
+			f1[km(i,a,q)] += scale
 			X_after_transition[m,i] = A_model[i]	
 			for mu in 1:P
 				psi_data[mu, km(i,X[m,i]+1, q)] += H_data[mu] * scale
@@ -350,6 +350,7 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
+#----- Although it shows clear autocorrelation decay, it cannot work for learning
 function PCD_rbm_site_update(q::Int64, L::Int64, P::Int64, 
 	      M::Int64, k_max::Int64, 
 	      h::Array{Float64, 1},xi::Array{Float64, 2},  
@@ -747,34 +748,24 @@ function get_statistics2(L::Int64, P::Int64, n_sample_each_chain::Int64, n_chain
 end
 
 
-function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64,  T_weight::Int64, T_eq::Int64,  xi::Array{Float64, 2}, h::Array{Float64, 1})
-	A_model = rand(0:20, L)	
-	H_model=zeros(P)
-	X_output = zeros(Int64, n_sample, L)	
-	for k in 1:n_chain	
-		for m=1:300
-			H_model = sampling_hidden(P,L,A_model,xi)
-			A_model = sampling_visible(q,L,P, H_model, h, xi)
-		end	
-		
-		for m=1:n_sample_each_chain
-			for t=1:n_weight
-				H_model = sampling_hidden(P,L,A_model,xi)
-				A_model = sampling_visible(q,L,P, H_model, h, xi)
-			end
-			for i=1:L
-				X_output[km(m,k,n_chain),i] = A_model[i]	
-			end
-		end
-	end	
-	return X_output	
+#T_eq_rbm = 100; T_weight_rbm=3
+##X_rbm = get_statistics_RBM(q, L, P, n_sample, T_weight_rbm, T_eq_rbm, 12.5*xi, h);
+function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64, T_weight::Int64, T_eq::Int64, xi::Array{Float64, 2}, h::Array{Float64, 1})
+    A_model = rand(0:(q-1), L)	
+    for t in 1:T_eq
+        H_model = sampling_hidden(P, L, A_model, xi)
+        A_model = sampling_visible(q,L,P, H_model, h, xi)
+    end
+    X_output = zeros(Int64, n_sample, L)
+    for n in 1:n_sample
+        for t in 1:T_weight
+            H_model = sampling_hidden(P, L, A_model, xi)
+            A_model = sampling_visible(q,L,P, H_model, h, xi)
+        end
+        X_output[n,:] = copy(A_model)
+    end
+    return X_output
 end
-
-
-
-
-
-
 
 function get_J_h_from_xi(q::Int64, L::Int64, P::Int64, xi::Array{Float64, 2})
 	#NOTE: h = h + h_xi: where h is the original h in RBM.
