@@ -52,10 +52,12 @@ function E_i_hidden_diff(i::Int64, a_old::Int64, a_prop::Int64, P::Int64, L::Int
 		    h::Array{Float64, 1}, xi::Array{Float64,2},
 		    A::Array{Int64, 1}, H::Array{Float64, 1})
 	e_i = 0.0
+	a_old +=1
+	a_prop +=1
 	for mu=1:P
-		e_i += - (xi[mu, km(i,a_propm+1,q)] - xi[mu, km(i,a_old+1, q)]) * H[mu]
+		e_i += - (xi[mu, km(i,a_prop,q)] - xi[mu, km(i,a_old, q)]) * H[mu]
 	end	
-	e_i += - (h[(i-1)*q+a_prop+1] - h[(i-1)*q+a_old+1]) 
+	e_i += - (h[km(i,a_prop,q)] - h[km(i,a_old,q)]) 
 	return e_i 
 end
 
@@ -78,6 +80,22 @@ end
 
 function sampling_visible_MH(q::Int64, L::Int64, P::Int64, 
 			    A::Array{Int64, 1}, H::Array{Float64,1},
+			    h::Array{Float64,1}, xi::Array{Float64, 2})
+	for i=1:L
+		a_old = A[i]	
+		a_prop = rand( vcat( 0:(a_old-1), (a_old+1):(q-1) ) )
+		
+		e_i_hidden =  E_i_hidden_diff(i, a_old, a_prop, P, L, h, xi, A, H)
+		r = exp(-e_i_hidden)
+		if(rand()<r)
+			A[i]=a_prop
+		end
+	end
+	return A
+end
+
+function sampling_visible_MH(q::Int64, L::Int64, P::Int64, 
+			    A::Array{Int64, 1}, H::Array{Float64,1},
 			    J::Array{Float64, 2}, Jfiliter::Array{Int64, 2},
 			    h::Array{Float64,1}, xi::Array{Float64, 2})
 	for i=1:L
@@ -93,16 +111,22 @@ function sampling_visible_MH(q::Int64, L::Int64, P::Int64,
 	return A
 end
 
+
+
 function sampling_hidden(P::Int64, L::Int64, 
 			 A::Array{Int64,1}, xi::Array{Float64,2 })
+	"""
 	H0 = zeros(P)
 	for mu=1:P
 		for i=1:L
-			H0[mu] += xi[mu, km(i,A[i]+1, q)] / L
+			H0[mu] += xi[mu, km(i,A[i]+1, q)]
 		end
 	end
-	#H0 = ones(P)	
-	return H0 +1.0/sqrt(L) * randn(P)
+	"""
+	#H0 = 1.0/L .* H0
+	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
+	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 end
 
 function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64, 
@@ -163,38 +187,35 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 	f2 = zeros(Float64, L*q, L*q)
 	psi_data = zeros(Float64, P, q*L)
 	psi_model = zeros(Float64, P, q*L)
-	scale = 1.0/M
+	myscale = 1.0/M
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)	
 	H_model_mean = zeros(P)
-	for m=1:M
-		#positive-term
-		H_data = sampling_hidden(P,L, X[m,:],xi)
-		#H_data_mean = H_data_mean + H_data
-		#negative-term
+	
+	for m in 1:M
+		H_data = sampling_hidden(P, L, X[m,:], xi) 
 		A_model = X_persistent[m,:]
-		for k=1:k_max
+		for k in 1:k_max
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
-			A_model = copy(sampling_visible(q,L,P, H_model, h, xi)) 
+			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
-		#H_model_mean = H_model_mean + H_model	
 		
-		for i in 1:L
-			a = A_model[i]+1
-			f1[km(i,a,q)] += scale
-			X_after_transition[m,i] = A_model[i]	
-			for mu in 1:P
-				psi_data[mu, km(i,X[m,i]+1, q)] += H_data[mu] * scale
-				psi_model[mu, km(i,a,q)] += H_model[mu] * scale
-			end
-			
-			for j in (i+1):L
-				b = A_model[j]+1 
-				f2[km(i,a,q), km(j,b,q)] += scale
-				f2[km(j,b,q), km(i,a,q)] += scale
-			end
-		end
+		X_after_transition[m,:] = A_model
+		
+		Amodel_add = A_model+ones(Int64,L)
+		f1[km.(1:L,Amodel_add,q)] .+= myscale
+
+		psi_data[:, km.(1:L,X[m,:]+ones(Int64,L), q)] .+= H_data*myscale;
+		psi_model[:, km.(1:L,Amodel_add, q)] .+= H_model*myscale;
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] .+= myscale
 	end
+
+	#----------- end of the sample loop put.
+	for i in 1:L
+	    f2[km.(i,1:q,q), km.(i,1:q,q)] = zeros(q,q) 
+	end
+	
+	
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
@@ -350,7 +371,6 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
-#----- Although it shows clear autocorrelation decay, it cannot work for learning
 function PCD_rbm_site_update(q::Int64, L::Int64, P::Int64, 
 	      M::Int64, k_max::Int64, 
 	      h::Array{Float64, 1},xi::Array{Float64, 2},  
@@ -409,10 +429,14 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	#C1 = f2_1 - f1_1*f1_1' # C1 is only possitive.
 	C_data = f2_data - f1_data*f1_data'
 	C_model = f2_model - f1_model*f1_model'
-	
+	for i in 1:L
+		C_data[km.(i,1:q, q), km.(i,1:q, q)] = zeros(q,q)
+		C_model[km.(i,1:q, q), km.(i,1:q, q)] = zeros(q,q)
+	end
+
+
 	#It works. 	
 	#reg_h, reg_xi = 1e-3, 1e-3 
-	
 	dh = f1_data - f1_model
 	dxi = psi_data - psi_model
 	dh2 = lambda_h*dh-reg_h*h
@@ -421,7 +445,7 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	h = h * (1.0 - reg_h*lambda_h) + lambda_h * dh   
 	xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
 	
-	"""
+	""" Regularization: Block-L1 reg. 
 	reg_vector = zeros(P)
 	reg_mat = zeros(L*P, q)	
 	for mu in 1:P
@@ -440,7 +464,7 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	end
 	xi = xi + lambda_xi * dxi - reg_xi*reg_mat 
 	"""
-
+	"""
 	c1vec = zeros(Float64, Int64(L*(L-1)*q*q/2) )
 	c2vec = zeros(Float64, Int64(L*(L-1)*q*q/2) )
 	pos = 0 
@@ -451,7 +475,11 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 		    pos += q^2
 		end
     	end
-	
+	"""
+
+	c1vec = vec(C_data)	
+	c2vec = vec(C_model)	
+
 	cc = Statistics.cor(c1vec,c2vec)
 	cslope = linreg(c1vec,c2vec)[2]
 	froc = LinearAlgebra.norm(c1vec - c2vec)
@@ -747,9 +775,6 @@ function get_statistics2(L::Int64, P::Int64, n_sample_each_chain::Int64, n_chain
 	return X_output	
 end
 
-
-#T_eq_rbm = 100; T_weight_rbm=3
-##X_rbm = get_statistics_RBM(q, L, P, n_sample, T_weight_rbm, T_eq_rbm, 12.5*xi, h);
 function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64, T_weight::Int64, T_eq::Int64, xi::Array{Float64, 2}, h::Array{Float64, 1})
     A_model = rand(0:(q-1), L)	
     for t in 1:T_eq
@@ -766,6 +791,7 @@ function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64, T_wei
     end
     return X_output
 end
+
 
 function get_J_h_from_xi(q::Int64, L::Int64, P::Int64, xi::Array{Float64, 2})
 	#NOTE: h = h + h_xi: where h is the original h in RBM.
