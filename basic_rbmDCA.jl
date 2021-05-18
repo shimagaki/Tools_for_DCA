@@ -20,12 +20,12 @@ function E_i_hidden(q::Int64, i::Int64, a::Int64, P::Int64,
 		    h::Array{Float64, 1}, xi::Array{Float64,2}, 
 		    H::Array{Float64, 1})
 	e_i = 0.0
-	
 	for mu=1:P
 		e_i += - xi[mu, km(i,a,q)] * H[mu]
-	end	
+	end
 	e_i += - h[km(i,a,q)]
-	return e_i 
+	return e_i	
+	#return sum(-xi[:, km(i,a,q)] .* H) - h[km(i,a,q)] 
 end
 
 
@@ -61,6 +61,7 @@ function E_i_hidden_diff(i::Int64, a_old::Int64, a_prop::Int64, P::Int64, L::Int
 	return e_i 
 end
 
+#------ baisc ------#
 function sampling_visible(q::Int64, L::Int64, P::Int64, 
 			  H::Array{Float64,1}, 
 			  h::Array{Float64,1}, xi::Array{Float64, 2})
@@ -76,7 +77,6 @@ function sampling_visible(q::Int64, L::Int64, P::Int64,
 	end
 	return A_return 
 end
-
 
 function sampling_visible_MH(q::Int64, L::Int64, P::Int64, 
 			    A::Array{Int64, 1}, H::Array{Float64,1},
@@ -115,18 +115,18 @@ end
 
 function sampling_hidden(P::Int64, L::Int64, 
 			 A::Array{Int64,1}, xi::Array{Float64,2 })
-	"""
 	H0 = zeros(P)
 	for mu=1:P
 		for i=1:L
 			H0[mu] += xi[mu, km(i,A[i]+1, q)]
 		end
 	end
-	"""
-	#H0 = 1.0/L .* H0
-	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	
+	return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
 	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
-	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
+	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
+	
+	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 end
 
 function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64, 
@@ -188,33 +188,48 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 	psi_data = zeros(Float64, P, q*L)
 	psi_model = zeros(Float64, P, q*L)
 	myscale = 1.0/M
-	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
-	H_data_mean = zeros(P)	
-	H_model_mean = zeros(P)
+	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) 
 	
 	for m in 1:M
-		H_data = sampling_hidden(P, L, X[m,:], xi) 
-		A_model = X_persistent[m,:]
+		H_data = copy(sampling_hidden(P, L, X[m,:], xi)) 
+		A_model = copy(X_persistent[m,:]) 
 		for k in 1:k_max
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
-		
-		X_after_transition[m,:] = A_model
+		X_after_transition[m,:] = copy(A_model) 
 		
 		Amodel_add = A_model+ones(Int64,L)
 		f1[km.(1:L,Amodel_add,q)] .+= myscale
 
-		psi_data[:, km.(1:L,X[m,:]+ones(Int64,L), q)] .+= H_data*myscale;
-		psi_model[:, km.(1:L,Amodel_add, q)] .+= H_model*myscale;
+		#psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] .+= H_data *myscale;
+		#psi_model[:, km.(1:L, Amodel_add,           q)] .+= H_model*myscale;
+		psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] += repeat(myscale*H_data, 1, L)
+		psi_model[:, km.(1:L, Amodel_add,           q)] += repeat(myscale*H_model, 1, L)
 		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] .+= myscale
+		"""	
+		for i in 1:L
+			a = A_model[i]+1
+			f1[km(i,a,q)] += myscale
+			X_after_transition[m,i] = A_model[i]	
+			for mu in 1:P
+				psi_data[mu, km(i, X[m,i]+1, q)] += H_data[mu] * myscale
+				psi_model[mu, km(i, a, q)] += H_model[mu] * myscale
+			end
+			
+			for j in (i+1):L
+				b = A_model[j]+1 
+				f2[km(i,a,q), km(j,b,q)] += myscale
+				f2[km(j,b,q), km(i,a,q)] += myscale
+			end
+		end
+		"""
 	end
 
 	#----------- end of the sample loop put.
 	for i in 1:L
 	    f2[km.(i,1:q,q), km.(i,1:q,q)] = zeros(q,q) 
 	end
-	
 	
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
@@ -464,19 +479,7 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	end
 	xi = xi + lambda_xi * dxi - reg_xi*reg_mat 
 	"""
-	"""
-	c1vec = zeros(Float64, Int64(L*(L-1)*q*q/2) )
-	c2vec = zeros(Float64, Int64(L*(L-1)*q*q/2) )
-	pos = 0 
-	for i in 1:L
-		for j in (i+1):L
-		    c1vec[pos .+ (1:q^2)] .= vec(C_data[(i-1)*q .+ (1:q), (j-1)*q .+ (1:q)])
-		    c2vec[pos .+ (1:q^2)] .= vec(C_model[(i-1)*q .+ (1:q), (j-1)*q .+ (1:q)])
-		    pos += q^2
-		end
-    	end
-	"""
-
+	
 	c1vec = vec(C_data)	
 	c2vec = vec(C_model)	
 
