@@ -24,7 +24,7 @@ function E_i_hidden(q::Int64, i::Int64, a::Int64, P::Int64,
 		e_i += - xi[mu, km(i,a,q)] * H[mu]
 	end
 	e_i += - h[km(i,a,q)]
-	return e_i	
+	return e_i
 	#return sum(-xi[:, km(i,a,q)] .* H) - h[km(i,a,q)] 
 end
 
@@ -62,6 +62,7 @@ function E_i_hidden_diff(i::Int64, a_old::Int64, a_prop::Int64, P::Int64, L::Int
 end
 
 #------ baisc ------#
+#-- Maybe this can be accelerate --#
 function sampling_visible(q::Int64, L::Int64, P::Int64, 
 			  H::Array{Float64,1}, 
 			  h::Array{Float64,1}, xi::Array{Float64, 2})
@@ -70,7 +71,9 @@ function sampling_visible(q::Int64, L::Int64, P::Int64,
 		e_i_hidden = zeros(q)
 		for a=1:q
 			e_i_hidden[a] =  E_i_hidden(q, i, a, P, h, xi, H)
-		end
+		end	
+		
+		#e_i_hidden = E_i_hidden.(q,i, 1:q, P, h, xi, H)	
 		weight = exp.(-e_i_hidden)
 		w = Weights(weight)
 		A_return[i] = sample(w) - 1
@@ -113,8 +116,8 @@ end
 
 
 
-function sampling_hidden(P::Int64, L::Int64, 
-			 A::Array{Int64,1}, xi::Array{Float64,2 })
+function sampling_hidden(P::Int64, L::Int64, A::Array{Int64,1}, xi::Array{Float64,2 })
+	
 	H0 = zeros(P)
 	for mu=1:P
 		for i=1:L
@@ -122,7 +125,13 @@ function sampling_hidden(P::Int64, L::Int64,
 		end
 	end
 	
+	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	# Noise-intensity change the symetryicity among hidden variables
+	# That is that the large noise enhance symetryicity of hidden 
+	# and the decrasing the noise break teh symetryicity. 
 	return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	
 	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
 	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 	
@@ -172,8 +181,6 @@ function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64,
 			end
 		end
 	end
-	#@show(H_data_mean/M)
-	#@show(H_model_mean/M)
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
@@ -197,6 +204,8 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
+		
+		"""
 		X_after_transition[m,:] = copy(A_model) 
 		
 		Amodel_add = A_model+ones(Int64,L)
@@ -223,7 +232,6 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 				f2[km(j,b,q), km(i,a,q)] += myscale
 			end
 		end
-		"""
 	end
 
 	#----------- end of the sample loop put.
@@ -434,7 +442,7 @@ function PCD_rbm_site_update(q::Int64, L::Int64, P::Int64,
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
-function gradient_ascent(q::Int64, L::Int64,P::Int64,  
+function gradient_ascent2(q::Int64, L::Int64,P::Int64,  
 			 lambda_h::Float64, lambda_xi::Float64, 
 			 reg_h::Float64, reg_xi::Float64,  
 			 f1_data::Array{Float64,1},  f1_model::Array{Float64,1}, 
@@ -454,10 +462,10 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	#reg_h, reg_xi = 1e-3, 1e-3 
 	dh = f1_data - f1_model
 	dxi = psi_data - psi_model
-	dh2 = lambda_h*dh-reg_h*h
-	dxi2 = lambda_xi*dxi-reg_xi*xi 
-	
+	#dh2 = lambda_h*dh-reg_h*h
+	#dxi2 = lambda_xi*dxi-reg_xi*xi 
 	h = h * (1.0 - reg_h*lambda_h) + lambda_h * dh   
+	#xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
 	xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
 	
 	""" Regularization: Block-L1 reg. 
@@ -486,10 +494,7 @@ function gradient_ascent(q::Int64, L::Int64,P::Int64,
 	cc = Statistics.cor(c1vec,c2vec)
 	cslope = linreg(c1vec,c2vec)[2]
 	froc = LinearAlgebra.norm(c1vec - c2vec)
-	return (xi,h,
-		sqrt(sum(dh.^2)), sqrt(sum(dxi.^2)), 
-		sqrt(sum(dh2.^2)), sqrt(sum(dxi2.^2)), 
-	        cc,cslope,froc) 
+	return (xi, h, sqrt(sum(dh.^2)), sqrt(sum(dxi.^2)), cc,cslope,froc) 
 end
 
 function gradient_ascent_l1(q::Int64, L::Int64,P::Int64,  
@@ -638,7 +643,7 @@ function output_paramters(t::Int64, L::Int64, q::Int64,  h::Array{Float64,1},  f
 	end
 	for i=1:L
 		for a=1:q
-			println(fout, "h ", i-1, " ", a-1, " ", h[(i-1)*q+a], " ", f1_data[(i-1)*q+a] ," ",f1[(i-1)*q+a], " ",f1_sample[(i-1)*q+a])
+			println(fout, "h ", i-1, " ", a-1, " ", h[km(i,a,q)], " ", f1_data[km(i,a,q)] ," ",f1[km(i,a,q)], " ",f1_sample[km(i,a,q)])
 		end
 	end
 	
@@ -687,10 +692,10 @@ function output_statistics(t::Int64, L::Int64, P::Int64, n_sample::Int64, n_weig
 	fout2 = open(fname_out2, "w")
 	for i in 1:L
 		for a in 1:q
-			println(fout1, i, " ", a, " ", f1_msa[(i-1)*q+a], " ", f1_out[(i-1)*q+a])
+			println(fout1, i, " ", a, " ", f1_msa[km(i,a,q)], " ", f1_out[km(i,a,q)])
 			for j in (i+1):L
 				for b in 1:q
-					println(fout2, i, " ", a, " ", j, " ", b, " ", f2_msa[(i-1)*q+a, (j-1)*q+b], " ", f2_out[(i-1)*q+a, (j-1)*q+b], " ", c2_msa[(i-1)*q+a, (j-1)*q+b], " ", c2_out[(i-1)*q+a, (j-1)*q+b])
+					println(fout2, i, " ", a, " ", j, " ", b, " ", f2_msa[km(i,a,q), km(j,b,q)], " ", f2_out[km(i,a,q), km(j,b,q)], " ", c2_msa[km(i,a,q), km(j,b,q)], " ", c2_out[km(i,a,q), km(j,b,q)])
 				end
 			end
 		end
@@ -811,11 +816,11 @@ function get_J_h_from_xi(q::Int64, L::Int64, P::Int64, xi::Array{Float64, 2})
 					end
 					temp = temp * scale
 					if(i!=j)	
-						J_xi[(i-1)*q+a, (j-1)*q+b] = temp 
-						J_xi[(j-1)*q+b, (i-1)*q+a] = temp 
+						J_xi[km(i,a,q), km(j,b,q)] = temp 
+						J_xi[km(j,b,q), km(i,a,q)] = temp 
 					end
 					if(i==j && b==a)	
-						h_xi[(i-1)*q+a] = temp 
+						h_xi[km(i,a,q)] = temp 
 					end
 				end
 			end

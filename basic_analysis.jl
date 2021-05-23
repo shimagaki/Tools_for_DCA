@@ -29,6 +29,35 @@ function get_MSA(fname, q, L, th)
     return X
 end
 
+function get_MSA_fast(fname, q, L, th)
+    X=readdlm(fname, Int)
+    X_temp = zeros(Int, N, q*L)
+    n_id=1
+    @show (N,L1) = size(X)
+    for n in 1:N
+        if(rand()<th)
+		X_temp[n_id, km.(1:L, X[n,:] + ones(L),q)] = ones(L) 
+            	n_id+=1
+        end
+    end
+    return X_temp[1:n_id,:]'
+    #M=size(X_temp,1)
+
+    #X_temp = X_temp + ones(Int, size(X_temp))
+    #X = zeros(Int, (M, L*q))
+
+    #for m in 1:M
+    #    for i in 1:L
+    #        X[m, ((i-1)*q+X_temp[m,i])] = 1
+    #    end
+    #end
+    #X=X'
+    #return X
+end
+
+
+
+
 function read_Xi(fname,P, L,q) 
 	X = readdlm(fname)    
 @show (n_max, n_ele) = size(X)
@@ -526,11 +555,11 @@ function f1_f2(X::Array{Int64, 2}, W::Array{Float64, 1}, q::Int64)
 	for m = 1:M
 		for i = 1:L
 			a = X[m,i]+1	
-			f1[(i-1)*q+a] += W[m] * scale
+			f1[km(i,a,q)] += W[m] * scale
 			for j = (i+1):L
 				b = X[m,j]+1
-				f2[(i-1)*q+a, (j-1)*q+b] += W[m] * scale
-				f2[(j-1)*q+b, (i-1)*q+a] += W[m] * scale
+				f2[km(i,a,q), km(j,b,q)] += W[m] * scale
+				f2[km(j,b,q), km(i,a,q)] += W[m] * scale
 			end
 		end
 	end
