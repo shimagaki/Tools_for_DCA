@@ -26,15 +26,20 @@ function read_contact(fname,q,L,id1,id2,id3,thresh, dist)
         return contact_out
 end
 
-function output_artificial_couplings(q, L, mean_v, var_v, cont_mat)
+function output_artificial_couplings(q, L, mean_v, var_v, density, cont_mat)
     coupling = zeros(q*L, q*L)
     for i in 1:L
         for j in (i+1):L
             for a in 1:q
+            for b in 1:q
               	#Assume nonzero entrories are only diagonal. 
-		value = mean_v*cont_mat[i,j] + var_v*randn()
-               	coupling[km(i,a,q), km(j,a,q)] = value
-               	coupling[km(j,a,q), km(i,a,q)] = value
+		if(rand()<density)
+			value = mean_v*cont_mat[i,j] + var_v*randn()
+			
+			coupling[km(i,a,q), km(j,b,q)] = value
+			coupling[km(j,b,q), km(i,a,q)] = value
+            	end
+            end
             end
         end
     end
@@ -50,11 +55,12 @@ end
 #    Note, frequencies of amino acids are based on the prob that is permuted at each residue positions
 #    Note, 
 #
-function output_artificial_field(rng,q,L,prob,eps)
+function output_artificial_field(rng,q,L,eps)
     #h_i(a) = log(f_i(a) + eps)
     h = zeros(q*L)
     for i in 1:L
-        freq = randperm!(rng, copy(prob)) * 0.1
+	    freq = rand(q)
+	    freq /= sum(freq)
         for a in 1:q
 		h[km(i,a,q)] = log( (1-eps)*freq[a] + eps/q )
         end
@@ -62,12 +68,13 @@ function output_artificial_field(rng,q,L,prob,eps)
     return h
 end
   
-function main_artificial_coupling_field(q,L,fname_cotact, fname_out)
-	@show "This method assumes only 4 states varialavres. Should be generalized." 
+function main_artificial_coupling_field(q,L, mean_v, var_v, density, fname_cotact, fname_out)
     fout = open(fname_out, "w")
     cont = read_contact(fname_cotact, q, L, 1,2,4,0.1,6.0);
-    J = output_artificial_couplings(q, L, 1.0, 0.3, cont);
-    h = output_artificial_field(rng,q,L,[1 2 3 4],0.01);
+    #mean_v, var_v, density = 1.5, 0.2, 0.3
+    amplitude_h = 10
+    J = output_artificial_couplings(q, L, mean_v, var_v, density, cont);
+    h = output_artificial_field(rng, q, L, 0.01);
     for i in 1:L
         for j in (i+1):L
             for a in 1:q

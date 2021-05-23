@@ -18,16 +18,8 @@ end
 """
 
 function E_i(q::Int64, L::Int, i::Int64, A::Array{Int64, 1}, J::Array{Float64, 2}, h::Array{Float64, 1})
-	e_i = 0.0
     	a = A[i]+1
-	for j in 1:(i-1)
-        b = A[j]+1	
-        e_i += -J[ km(i,a,q), km(j,b,q) ]
-	end
-	for j in (i+1):L
-        b = A[j]+1	
-        e_i += -J[ km(i,a,q), km(j,b,q) ]
-	end
+ 	e_i = - sum( J[km.(i,a,q), km.(1:L, A+ones(Int, L), q)] )	
 	e_i += -h[ km(i,a,q) ]
 	return e_i 
 end 
@@ -62,7 +54,8 @@ function Metropolis_Hastings(E_old::Float64, q::Int64, L::Int64, i::Int64, A::Ar
     A_prop = copy(A); A_prop[i] = a_proposed
     E_new = E_i(q, L, i, A_prop, J, h)
     dE = E_new - E_old
-	w = exp(-dE); r = rand()    
+	w = exp(-dE); 
+	r = rand()    
     
     if(w>r)
         return (1, A_prop, E_new) 
@@ -353,7 +346,6 @@ function output_paramters(t::Int64, L::Int64, q::Int64, h::Array{Float64, 1}, J:
 	close(fout)
 end
 
-
 # Run two MCMCs q1 and q2, c :=<q1,q2>
 # <q(0),q(t^*)> ~ c
 function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J::Array{Float64, 2}, h::Array{Float64, 1})
@@ -362,14 +354,14 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
     @show size(J)
     @show size(h)
     for n in 1:n_max
-        A1 = rand(0:(q-1), L)
-        A2 = rand(0:(q-1), L)
+	A1 = rand(0:(q-1), L)
         E_old = E_i(q, L, 1, A1, J, h)
         for m=1:T_eq
             i = rand(1:L)
-            A1_copy = copy(A1)
             (n_accepted, A1, E_old) = Metropolis_Hastings(E_old, q, L, i, A1, J, h)
         end        
+        
+	A2 = rand(0:(q-1), L)
         E_old = E_i(q, L, 1, A2, J, h)
         for m=1:T_eq
             i = rand(1:L)
@@ -381,22 +373,24 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
     av_overlap /= n_max
 
     A0_vec = rand(0:(q-1), (n_max, L))
-    A_vec = copy(A0_vec)
     Auto_corr = zeros(T_eq)
     E_old_vec = zeros(n_max)
+    
+    #--- This is needed for the recurrsive function ---#
     for n in 1:n_max
         E_old_vec[n] = E_i(q, L, 1, A0_vec[n,:], J, h)
     end
     
-    for t in 1:T_eq
-        for n in 1:n_max
+    A_vec = copy(A0_vec)
+    for n in 1:n_max
+    	for t in 1:T_eq
             i = rand(1:L)
-            (n_accepted, A_vec[n,:], E_old_vec[n]) = Metropolis_Hastings(E_old_vec[n], q, L, i, A_vec[n,:], J, h)
+	    (n_accepted, A_vec[n,:], E_old_vec[n]) = Metropolis_Hastings(E_old_vec[n], q, L, i, A_vec[n,:], J, h)
             #@show sum(kr.(A_vec[n,:], A0_vec[n,:]))
             Auto_corr[t] += sum(kr.(A0_vec[n,:], A_vec[n,:]))
         end
-        Auto_corr[t] /= n_max
     end
+    Auto_corr ./= n_max
     
     Plots.plot(Auto_corr, label="overlap between <q(t)q(0)>")
     p1 = Plots.plot!(av_overlap*ones(size(Auto_corr)), label="overlap between independent <q1q2>")
