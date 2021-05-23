@@ -1,62 +1,30 @@
 function get_MSA(fname, q, L, th)
     X=readdlm(fname, Int)
-    X_temp=[]
+    (N,L1) = size(X)
+    X_temp = zeros(Int, N, q*L)
     n_id=1
-    @show size(X)
-    for n in 1:size(X,1) 
-        r=rand()
-        if(r<th)
-            if(n_id==1)
-                X_temp = X[n,:]'
-            end
-            if(n_id>1)
-                X_temp = vcat(X_temp, X[n,:]')
-            end
-            n_id+=1
-        end
+    for n in 1:N
+        if(rand()<th)
+		X_temp[n_id, km.(1:L, X[n,:] + ones(Int, L),q)] = ones(Int, L) 
+        	n_id +=1
+	end
     end
-    M=size(X_temp,1)
-
-    X_temp = X_temp + ones(Int, size(X_temp))
-    X = zeros(Int, (M, L*q))
-
-    for m in 1:M
-        for i in 1:L
-            X[m, ((i-1)*q+X_temp[m,i])] = 1
-        end
-    end
-    X=X'
-    return X
+    return X_temp[1:(n_id-1),:]'
 end
 
 function get_MSA_fast(fname, q, L, th)
     X=readdlm(fname, Int)
+    (N,L1) = size(X)
     X_temp = zeros(Int, N, q*L)
     n_id=1
-    @show (N,L1) = size(X)
     for n in 1:N
         if(rand()<th)
-		X_temp[n_id, km.(1:L, X[n,:] + ones(L),q)] = ones(L) 
-            	n_id+=1
-        end
+		X_temp[n_id, km.(1:L, X[n,:] + ones(Int, L),q)] = ones(Int, L) 
+        	n_id +=1
+	end
     end
-    return X_temp[1:n_id,:]'
-    #M=size(X_temp,1)
-
-    #X_temp = X_temp + ones(Int, size(X_temp))
-    #X = zeros(Int, (M, L*q))
-
-    #for m in 1:M
-    #    for i in 1:L
-    #        X[m, ((i-1)*q+X_temp[m,i])] = 1
-    #    end
-    #end
-    #X=X'
-    #return X
+    return X_temp[1:(n_id-1),:]'
 end
-
-
-
 
 function read_Xi(fname,P, L,q) 
 	X = readdlm(fname)    
