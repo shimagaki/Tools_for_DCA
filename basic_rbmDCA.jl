@@ -230,7 +230,7 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 		#psi_model[:, km.(1:L, Amodel_add,           q)] .+= H_model*myscale;
 		psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] += repeat(myscale*H_data, 1, L)
 		psi_model[:, km.(1:L, Amodel_add,           q)] += repeat(myscale*H_model, 1, L)
-		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] .+= myscale
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones(L,L)
 		"""	
 		for i in 1:L
 			a = A_model[i]+1
