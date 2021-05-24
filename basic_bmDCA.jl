@@ -372,22 +372,22 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
     end
     av_overlap /= n_max
 
-    A0_vec = rand(0:(q-1), (n_max, L))
-    Auto_corr = zeros(T_eq)
-    E_old_vec = zeros(n_max)
     
     #--- This is needed for the recurrsive function ---#
+    Auto_corr = zeros(T_eq)
     for n in 1:n_max
-        E_old_vec[n] = E_i(q, L, 1, A0_vec[n,:], J, h)
-    end
-    
-    A_vec = copy(A0_vec)
-    for n in 1:n_max
+    	A0_vec = rand(0:(q-1), L)
+	E_old = 0.0 
+        for m=1:T_eq
+            i = rand(1:L)
+            (n_accepted, A0_vec, E_old) = Metropolis_Hastings(E_old, q, L, i, A0_vec, J, h)
+    	end	
+	
+	A_vec = copy(A0_vec)
     	for t in 1:T_eq
             i = rand(1:L)
-	    (n_accepted, A_vec[n,:], E_old_vec[n]) = Metropolis_Hastings(E_old_vec[n], q, L, i, A_vec[n,:], J, h)
-            #@show sum(kr.(A_vec[n,:], A0_vec[n,:]))
-            Auto_corr[t] += sum(kr.(A0_vec[n,:], A_vec[n,:]))
+	    (n_accepted, A_vec, E_old) = Metropolis_Hastings(E_old, q, L, i, A_vec, J, h)
+            Auto_corr[t] += sum(kr.(A0_vec, A_vec))
         end
     end
     Auto_corr ./= n_max

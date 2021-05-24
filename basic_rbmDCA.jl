@@ -19,13 +19,15 @@ end
 function E_i_hidden(q::Int64, i::Int64, a::Int64, P::Int64, 
 		    h::Array{Float64, 1}, xi::Array{Float64,2}, 
 		    H::Array{Float64, 1})
+	"""
 	e_i = 0.0
 	for mu=1:P
 		e_i += - xi[mu, km(i,a,q)] * H[mu]
 	end
 	e_i += - h[km(i,a,q)]
 	return e_i
-	#return sum(-xi[:, km(i,a,q)] .* H) - h[km(i,a,q)] 
+	"""
+	return sum(-xi[:, km(i,a,q)] .* H) - h[km(i,a,q)] 
 end
 
 
@@ -72,9 +74,23 @@ function sampling_visible(q::Int64, L::Int64, P::Int64,
 		for a=1:q
 			e_i_hidden[a] =  E_i_hidden(q, i, a, P, h, xi, H)
 		end	
-		
 		#e_i_hidden = E_i_hidden.(q,i, 1:q, P, h, xi, H)	
 		weight = exp.(-e_i_hidden)
+		w = Weights(weight)
+		A_return[i] = sample(w) - 1
+	end
+	return A_return 
+end
+
+#-- Is this really fast? --> simple sampling_visible is faster ..  --#
+function sampling_visible_fast(q::Int64, L::Int64, P::Int64, 
+			  H::Array{Float64,1}, 
+			  h::Array{Float64,1}, xi::Array{Float64, 2})
+	A_return = zeros(Int, L)	
+	for i=1:L
+		e_i_hidden = sum(-xi[:, km.(i,1:q,q)] .* H, dims=1)-h[km.(i,1:q,q)]'
+		
+		weight = vec(exp.(-e_i_hidden)) 
 		w = Weights(weight)
 		A_return[i] = sample(w) - 1
 	end
@@ -118,24 +134,24 @@ end
 
 function sampling_hidden(P::Int64, L::Int64, A::Array{Int64,1}, xi::Array{Float64,2 })
 	
-	H0 = zeros(P)
-	for mu=1:P
-		for i=1:L
-			H0[mu] += xi[mu, km(i,A[i]+1, q)]
-		end
-	end
+	#H0 = zeros(P)
+	#for mu=1:P
+	#	for i=1:L
+	#		H0[mu] += xi[mu, km(i,A[i]+1, q)]
+	#	end
+	#end
 	
 	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
 	# Noise-intensity change the symetryicity among hidden variables
 	# That is that the large noise enhance symetryicity of hidden 
 	# and the decrasing the noise break teh symetryicity. 
-	return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
+	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
 	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
 	
 	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
 	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 	
-	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
+	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 end
 
 function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64, 
@@ -205,7 +221,6 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
 		
-		"""
 		X_after_transition[m,:] = copy(A_model) 
 		
 		Amodel_add = A_model+ones(Int64,L)
@@ -232,6 +247,7 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 				f2[km(j,b,q), km(i,a,q)] += myscale
 			end
 		end
+		"""
 	end
 
 	#----------- end of the sample loop put.
