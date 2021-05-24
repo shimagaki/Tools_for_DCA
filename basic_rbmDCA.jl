@@ -27,7 +27,7 @@ function E_i_hidden(q::Int64, i::Int64, a::Int64, P::Int64,
 	e_i += - h[km(i,a,q)]
 	return e_i
 	"""
-	return sum(-xi[:, km(i,a,q)] .* H) - h[km(i,a,q)] 
+	return -xi[:, km(i,a,q)]' * H - h[km(i,a,q)] 
 end
 
 
@@ -70,11 +70,12 @@ function sampling_visible(q::Int64, L::Int64, P::Int64,
 			  h::Array{Float64,1}, xi::Array{Float64, 2})
 	A_return = zeros(Int, L)	
 	for i=1:L
-		e_i_hidden = zeros(q)
-		for a=1:q
-			e_i_hidden[a] =  E_i_hidden(q, i, a, P, h, xi, H)
-		end	
+		#e_i_hidden = zeros(q)
+		#for a=1:q
+		#	e_i_hidden[a] =  E_i_hidden(q, i, a, P, h, xi, H)
+		#end	
 		#e_i_hidden = E_i_hidden.(q,i, 1:q, P, h, xi, H)	
+		e_i_hidden = -xi[:, km.(i,1:q,q)]' * H -h[km.(i,1:q,q)]
 		weight = exp.(-e_i_hidden)
 		w = Weights(weight)
 		A_return[i] = sample(w) - 1
@@ -88,9 +89,10 @@ function sampling_visible_fast(q::Int64, L::Int64, P::Int64,
 			  h::Array{Float64,1}, xi::Array{Float64, 2})
 	A_return = zeros(Int, L)	
 	for i=1:L
-		e_i_hidden = sum(-xi[:, km.(i,1:q,q)] .* H, dims=1)-h[km.(i,1:q,q)]'
-		
-		weight = vec(exp.(-e_i_hidden)) 
+		#-- Why not take the inner product?	
+		#e_i_hidden = sum(-xi[:, km.(i,1:q,q)] .* H, dims=1)-h[km.(i,1:q,q)]'
+		e_i_hidden = -xi[:, km.(i,1:q,q)]' * H -h[km.(i,1:q,q)]
+		weight = exp.(-e_i_hidden) 
 		w = Weights(weight)
 		A_return[i] = sample(w) - 1
 	end
@@ -151,7 +153,8 @@ function sampling_hidden(P::Int64, L::Int64, A::Array{Int64,1}, xi::Array{Float6
 	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
 	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
 	
-	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
+	H0 = 1.0/L * vec(sum(xi[1:P,km.(1:L,A + ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
+	return H0 
 end
 
 function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64, 
@@ -169,12 +172,14 @@ function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)	
 	H_model_mean = zeros(P)
+	H_data = zeros(P); H_model = zeros(P)
 	for m=1:M
 		#positive-term
 		H_data = sampling_hidden(P,L, X[m,:],xi)
 		#H_data_mean = H_data_mean + H_data
 		#negative-term
 		A_model = X_persistent[m,:]
+		
 		for k=1:k_max
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible_MH(q,L,P, A_model, H_model, J, Jfiliter, h, xi)) 
@@ -211,26 +216,40 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 	psi_data = zeros(Float64, P, q*L)
 	psi_model = zeros(Float64, P, q*L)
 	myscale = 1.0/M
-	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) 
+	A_model = zeros(Int64, L);
+	#H_model=zeros(P); H_data=zeros(P) 
+	ones_L = ones(Int64,L)
+	
+	# Becareful for having differenet hidden variables/patterens. 
+	#H_model = zeros(P); H_data = zeros(P)
 	
 	for m in 1:M
+		# --- Be careful they should be able to use in the k_max loop. --- # 
 		H_data = copy(sampling_hidden(P, L, X[m,:], xi)) 
 		A_model = copy(X_persistent[m,:]) 
 		for k in 1:k_max
+			global H_model
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
 		
 		X_after_transition[m,:] = copy(A_model) 
 		
-		Amodel_add = A_model+ones(Int64,L)
+		Amodel_add = A_model+ones_L
 		f1[km.(1:L,Amodel_add,q)] .+= myscale
-
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones(L,L)
 		#psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] .+= H_data *myscale;
 		#psi_model[:, km.(1:L, Amodel_add,           q)] .+= H_model*myscale;
-		psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] += repeat(myscale*H_data, 1, L)
-		psi_model[:, km.(1:L, Amodel_add,           q)] += repeat(myscale*H_model, 1, L)
-		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones(L,L)
+		
+		#@show "m=",m
+		#@show X[m,:]+ones(Int64,L) 
+		#@show Amodel_add	
+		#@show H_data 
+		#@show H_model	
+		#Is it the effect of the repeat?	
+		# Is this reeally adding 
+		psi_data[:,  km.(1:L, X[m,:]+ones_L, q)] += repeat(myscale * H_data, 1, L)
+		psi_model[:, km.(1:L, Amodel_add, q)] += repeat(myscale * H_model, 1, L)
 		"""	
 		for i in 1:L
 			a = A_model[i]+1
@@ -275,6 +294,8 @@ function pCDk_rbm_minibatch(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)	
 	H_model_mean = zeros(P) 
+	H_data = zeros(P); H_model = zeros(P)
+	
 	for n=1:n_batch
 		m = id_set[n]
 		#positive-term
@@ -282,7 +303,9 @@ function pCDk_rbm_minibatch(q::Int64, L::Int64, P::Int64,
 		#H_data_mean = H_data_mean + H_data
 		#negative-term
 		A_model = X_persistent[m,:]
+		
 		for k=1:k_max
+			#Be careful, is your H_model global variable?
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P, H_model, h, xi)) 
 		end
@@ -326,6 +349,7 @@ function pCDk_rbm_weight(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)
 	H_model_mean = zeros(P)
+	H_data = zeros(P); H_model = zeros(P)
 	for m=1:M
 		#positive-term
 		H_data = sampling_hidden(P,L, X[m,:],xi)
@@ -378,6 +402,8 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)
 	H_model_mean = zeros(P)
+	H_data = zeros(P)
+	H_model = zeros(P)
 	for n=1:n_batch
 		m = id_set[n]
 		#positive-term
@@ -386,6 +412,7 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 		#negative-term
 		A_model = X_persistent[m,:]
 		for k=1:k_max
+			# Be careful, is H_model global?
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P, H_model, h, xi)) 
 		end
@@ -424,6 +451,8 @@ function PCD_rbm_site_update(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P)
 	H_data_mean = zeros(P)	
 	H_model_mean = zeros(P)
+	H_data = zeros(P)	
+	H_model = zeros(P)
 	for m=1:M
 		#positive-term
 		H_data = sampling_hidden(P,L, X[m,:],xi)
@@ -480,9 +509,9 @@ function gradient_ascent2(q::Int64, L::Int64,P::Int64,
 	dxi = psi_data - psi_model
 	#dh2 = lambda_h*dh-reg_h*h
 	#dxi2 = lambda_xi*dxi-reg_xi*xi 
-	h = h * (1.0 - reg_h*lambda_h) + lambda_h * dh   
+	h = (1.0 - reg_h*lambda_h) * copy(h) + lambda_h * dh   
 	#xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
-	xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
+	xi = (1.0 - reg_xi*lambda_xi) * copy(xi) + lambda_xi * dxi
 	
 	""" Regularization: Block-L1 reg. 
 	reg_vector = zeros(P)
@@ -683,6 +712,7 @@ function output_statistics(t::Int64, L::Int64, P::Int64, n_sample::Int64, n_weig
 	
 	for m=1:n_sample
 		for t=1:n_weight
+			#Be careful, is H_model global?
 			H_model = sampling_hidden(P,L,A_model,xi)
 			A_model = sampling_visible(q,L,P, H_model, h, xi)
 		end
@@ -801,8 +831,10 @@ end
 
 function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64, T_weight::Int64, T_eq::Int64, xi::Array{Float64, 2}, h::Array{Float64, 1})
     A_model = rand(0:(q-1), L)	
+    H_model = zeros(P)
     for t in 1:T_eq
-        H_model = sampling_hidden(P, L, A_model, xi)
+        #Be careful, is H_model global?
+	H_model = sampling_hidden(P, L, A_model, xi)
         A_model = sampling_visible(q,L,P, H_model, h, xi)
     end
     X_output = zeros(Int64, n_sample, L)
