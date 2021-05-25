@@ -219,6 +219,7 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L);
 	#H_model=zeros(P); H_data=zeros(P) 
 	ones_L = ones(Int64,L)
+	ones_LL = ones(Int64,L*L)
 	
 	# Becareful for having differenet hidden variables/patterens. 
 	#H_model = zeros(P); H_data = zeros(P)
@@ -232,12 +233,11 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 			H_model = copy(sampling_hidden(P,L,A_model,xi)) 
 			A_model = copy(sampling_visible(q,L,P,H_model,h, xi)) 
 		end
-		
 		X_after_transition[m,:] = copy(A_model) 
 		
 		Amodel_add = A_model+ones_L
-		f1[km.(1:L,Amodel_add,q)] .+= myscale
-		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones(L,L)
+		f1[km.(1:L,Amodel_add,q)] += myscale * ones_L 
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones_LL
 		#psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] .+= H_data *myscale;
 		#psi_model[:, km.(1:L, Amodel_add,           q)] .+= H_model*myscale;
 		
@@ -843,7 +843,7 @@ function get_statistics_RBM(q::Int64, L::Int64, P::Int64, n_sample::Int64, T_wei
             H_model = sampling_hidden(P, L, A_model, xi)
             A_model = sampling_visible(q,L,P, H_model, h, xi)
         end
-        X_output[n,:] = copy(A_model)
+	X_output[n,:] = copy(A_model)
     end
     return X_output
 end
