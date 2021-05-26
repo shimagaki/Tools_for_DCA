@@ -94,8 +94,9 @@ function sampling_visible_fast(q::Int64, L::Int64, P::Int64,
 		e_i_hidden = -xi[:, km.(i,1:q,q)]' * H -h[km.(i,1:q,q)]
 		weight = exp.(-e_i_hidden) 
 		w = Weights(weight)
-		A_return[i] = sample(w) - 1
+		A_return[i] = sample(w)
 	end
+	A_return = A_return - ones(Int64, L)
 	return A_return 
 end
 
@@ -136,25 +137,7 @@ end
 
 function sampling_hidden(P::Int64, L::Int64, A::Array{Int64,1}, xi::Array{Float64,2 })
 	
-	#H0 = zeros(P)
-	#for mu=1:P
-	#	for i=1:L
-	#		H0[mu] += xi[mu, km(i,A[i]+1, q)]
-	#	end
-	#end
-	
-	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
-	# Noise-intensity change the symetryicity among hidden variables
-	# That is that the large noise enhance symetryicity of hidden 
-	# and the decrasing the noise break teh symetryicity. 
-	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
-	#return 1.0/L * H0 +1.0/sqrt(L) * randn(P)
-	
-	#H0 = 1.0/L * sum(xi[1:P,km.(1:L,A .+1,q) ],dims=2) + 1.0/sqrt(L) * randn(P)
-	#return 1.0/L * vec(sum(xi[1:P,km.(1:L,A +ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
-	
-	H0 = 1.0/L * vec(sum(xi[1:P,km.(1:L,A + ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)
-	return H0 
+	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A + ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)  
 end
 
 function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64, 
@@ -205,6 +188,7 @@ function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64,
 	return (f1, f2, psi_data, psi_model, X_after_transition) 
 end
 
+#-- k_max>=2 is important? 
 function pCDk_rbm(q::Int64, L::Int64, P::Int64, 
 	      M::Int64, k_max::Int64, 
 	      h::Array{Float64, 1},xi::Array{Float64, 2},  
@@ -219,7 +203,8 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 	A_model = zeros(Int64, L);
 	#H_model=zeros(P); H_data=zeros(P) 
 	ones_L = ones(Int64,L)
-	ones_LL = ones(Int64,L*L)
+	ones_L_float = ones(L)
+	ones_LL_float = ones(L,L)
 	
 	# Becareful for having differenet hidden variables/patterens. 
 	#H_model = zeros(P); H_data = zeros(P)
@@ -236,18 +221,18 @@ function pCDk_rbm(q::Int64, L::Int64, P::Int64,
 		X_after_transition[m,:] = copy(A_model) 
 		
 		Amodel_add = A_model+ones_L
-		f1[km.(1:L,Amodel_add,q)] += myscale * ones_L 
-		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones_LL
+		f1[km.(1:L,Amodel_add,q)] += myscale * ones_L_float 
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones_LL_float
 		#psi_data[:,  km.(1:L, X[m,:]+ones(Int64,L), q)] .+= H_data *myscale;
 		#psi_model[:, km.(1:L, Amodel_add,           q)] .+= H_model*myscale;
 		
 		#@show "m=",m
 		#@show X[m,:]+ones(Int64,L) 
-		#@show Amodel_add	
+		#@show Amodel_add
 		#@show H_data 
-		#@show H_model	
-		#Is it the effect of the repeat?	
-		# Is this reeally adding 
+		#@show H_model
+		#Is it the effect of the repeat?
+		# Is this reeally adding
 		psi_data[:,  km.(1:L, X[m,:]+ones_L, q)] += repeat(myscale * H_data, 1, L)
 		psi_model[:, km.(1:L, Amodel_add, q)] += repeat(myscale * H_model, 1, L)
 		"""	
@@ -509,9 +494,9 @@ function gradient_ascent2(q::Int64, L::Int64,P::Int64,
 	dxi = psi_data - psi_model
 	#dh2 = lambda_h*dh-reg_h*h
 	#dxi2 = lambda_xi*dxi-reg_xi*xi 
-	h = (1.0 - reg_h*lambda_h) * copy(h) + lambda_h * dh   
+	h = (1.0 - reg_h*lambda_h) * h + lambda_h * dh   
 	#xi = xi * (1.0 - reg_xi*lambda_xi) + lambda_xi * dxi
-	xi = (1.0 - reg_xi*lambda_xi) * copy(xi) + lambda_xi * dxi
+	xi = (1.0 - reg_xi*lambda_xi) * xi + lambda_xi * dxi
 	
 	""" Regularization: Block-L1 reg. 
 	reg_vector = zeros(P)
