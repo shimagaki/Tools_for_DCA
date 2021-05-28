@@ -11,7 +11,7 @@ function read_dist(fname,q,L,id1,id2,id3)
         return contact_out
 end
 
-function read_contact(fname,q,L,id1,id2,id3,thresh, dist) 
+function read_contact(fname,q,L,id1,id2,id3,dist) 
         X = readdlm(fname)    
         @show (n_max, n_ele) = size(X)
         contact_out = zeros(L,L)
