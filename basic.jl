@@ -25,6 +25,7 @@ function f1_f2_c2(X::Array{Int64, 2}, W::Array{Float64, 1}, q::Int64)
 	f1 = zeros(Float64, L*q)
 	f2 = zeros(Float64, L*q, L*q)
 	c2 = zeros(Float64, L*q, L*q)
+	# Better to make it to be matrix vector operation.	
 	for m in 1:M
 		for i in 1:L
 			a = X[m,i]+1
@@ -140,4 +141,16 @@ function categorical2binary(X, q)
 	    end
 	end
 	return X_binary'
+end
+
+function write_seq_to_num_file(fname, Data)
+    fout_seq = open(fname, "w")
+    N,L = size(Data)
+    for n in 1:N
+        for i in 1:L
+            print(fout_seq, Data[n,i], " ")
+        end
+        println(fout_seq,"")
+    end
+    close(fout_seq)
 end
