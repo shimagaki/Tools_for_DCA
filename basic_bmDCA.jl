@@ -83,32 +83,31 @@ function pCDk(X::Array{Int64, 2}, k_max::Int64, M::Int64, q::Int64, L::Int64, J:
 	X_after_transition = zeros(Int64, M, L)
 	f1 = zeros(Float64, L*q)
 	f2 = zeros(Float64, L*q, L*q)
-	scale = 1.0/M	
-	A = rand(0:(q-1), L)
-    	E_old = E_i(q, L, 1, A, J, h)
+	myscale = 1.0/M	
+	
+	ones_L = ones(Int64,L)
+	ones_L_float = ones(L)
+	ones_LL_float = ones(L,L)
+	
+    	E_old = 0.0
 	for m=1:M
+		A = copy(X[m,:])
 		for k=1:k_max
 			#(n_accepted, A) = Monte_Carlo_sweep(q, L, A, J, h)
 			(n_accepted, A, E_old) = Monte_Carlo_sweep(E_old, q, L, A, J, h)
 		end
 		
-		for i in 1:L
-			a = X[m,i]+1 #1 to 21
-			f1[(i-1)*q+a] += scale
-			X_after_transition[m,i] = A[i]	
-			for j in (i+1):L
-				b = X[m,j] + 1 
-				f2[(i-1)*q+a, (j-1)*q+b] += scale
-				f2[(j-1)*q+b, (i-1)*q+a] += scale
-			end
-		end
+		X_after_transition[m,:] = copy(A) 
+		A_model_add = A + ones_L	
+		f1[km.(1:L,Amodel_add,q)] += myscale * ones_L_float 
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * ones_LL_float
 	end
 	return (f1, f2, X_after_transition) 
 end
 
 function pCDk_minibatch(X_persistent::Array{Int64, 2}, id_set::Array{Int64, 1}, k_max::Int64, M::Int64, q::Int64, L::Int64, J::Array{Float64, 2}, h::Array{Float64, 1}) 
 	X_after_transition = copy(X_persistent) 
-	f1 = zeros(Float64, L*q)
+	f2 = zeros(Float64, L*q)
 	f2 = zeros(Float64, L*q, L*q)
 	n_batch = size(id_set, 1)
 	scale = 1.0/(n_batch)	
@@ -143,24 +142,17 @@ function pCDk_weight(X::Array{Int64, 2}, k_max::Int64, M::Int64, W::Array{Float6
 	f1 = zeros(Float64, L*q)
 	f2 = zeros(Float64, L*q, L*q)
 	M_eff = sum(W)	
-	scale = 1.0/M_eff
+	myscale = 1.0/M_eff
 
-	A = rand(0:(q-1), L)
 	for m=1:M
+		A = copy(X[m,:])
 		for k=1:k_max
-			(n_accepted, A) = Monte_Carlo_sweep(q, L, A, J, h)
+			(n_accepted, A, E_old) = Monte_Carlo_sweep(E_old, q, L, A, J, h)
 		end
-		
-		for i in 1:L
-			a = X[m,i]+1 #1 to 21
-			f1[(i-1)*q+a] += W[m] * scale
-			X_after_transition[m,i] = A[i]	
-			for j in (i+1):L
-				b = X[m,j] + 1 
-				f2[(i-1)*q+a, (j-1)*q+b] += W[m] * scale
-				f2[(j-1)*q+b, (i-1)*q+a] += W[m] * scale
-			end
-		end
+		X_after_transition[m,:] = copy(A) 
+		A_model_add = A + ones_L	
+		f1[km.(1:L,Amodel_add,q)] += myscale * W[m] * ones_L_float 
+		f2[ km.(1:L,Amodel_add,q), km.(1:L,Amodel_add,q) ] += myscale * W[m] * ones_LL_float
 	end
 	return (f1, f2, X_after_transition) 
 end
