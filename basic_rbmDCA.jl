@@ -136,7 +136,6 @@ end
 
 
 function sampling_hidden(P::Int64, L::Int64, A::Array{Int64,1}, xi::Array{Float64,2 })
-	
 	return 1.0/L * vec(sum(xi[1:P,km.(1:L,A + ones(Int64,L),q) ],dims=2)) + 1.0/sqrt(L) * randn(P)  
 end
 
