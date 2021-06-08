@@ -816,4 +816,21 @@ function get_projection(Mat, P)
     return Project
 end
 
+function get_L_plm_i(q, L, i, A, h, J)
+    #return -(sum(J[km.(i,a,q), km.(1:L, A+ones(Int64,L), q)], dims=2) + h[km.(i,a,q)] )
+    #return -(sum(J[km.(i,1:q,q), km.(1:L, A+ones(Int64,L), q)], dims=2) + h[km.(i,1:q,q)])
+    A_plus_ones = A+ones(Int64,L)
+    l_i_PL = sum(J[km.(i, A_plus_ones[i],q), km.(1:L, A_plus_ones, q)]) + h[km.(i,A_plus_ones[i],q)] 
+    l_i_PL += - log(sum(exp.(sum(J[km.(i,1:q,q), km.(1:L, A_plus_ones, q)], dims=2) + h[km.(i,1:q,q)] )))
+    return l_i_PL
+    
+end
 
+function get_plm_vec(q,L,X, W, J, h)
+    M = size(X,1)
+    plm_vec = zeros(M);
+    for n in 1:M
+	    plm_vec[n] = W[n]* sum( [get_L_plm_i(q, L, i, X[n, :], h, J) for i in 1:L] )
+    end
+    return sum(plm_vec) / sum(W) 
+end
