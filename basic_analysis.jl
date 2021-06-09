@@ -834,3 +834,45 @@ function get_plm_vec(q,L,X, W, J, h)
     end
     return sum(plm_vec) / sum(W) 
 end
+
+
+function get_ppv_and_score(q,L,contact,J)
+    F_temp = J_to_Frob(q,L,J)
+    F_i = sum(F_temp, dims=1)/size(F_temp,1);
+    F__ = sum(F_i)/length(F_i)
+    F_apc_temp = F_temp - F_i'*F_i/F__;
+
+    score_list = zeros(Int(L*(L-5)/2), 4)
+    n = 1
+    for i in 1:L
+        for j in (i+5):L
+            score_list[n,1], score_list[n,2], score_list[n,3] = i,j, F_apc_temp[i,j], F_temp[i,j]
+            n  += 1
+        end
+    end
+    score_list = copy(score_list[1:(n-1),:]);
+   
+    sorted_id_apc = sortperm(score_list[:,3], rev=true);
+    sorted_id_frob = sortperm(score_list[:,4], rev=true);
+   
+   
+    ppv_curves_apc = zeros(size(score_list, 1))
+    ppv_curves_frob = zeros(size(score_list, 1))
+   
+    score_list = copy(score_list[sorted_id_apc,:])
+    n_TP = 0.0;
+    for n in 1:size(score_list,1)
+        i,j = Int(score_list[n,1]), Int(score_list[n,2])
+        n_TP += contact[i,j]
+        ppv_curves_apc[n] = n_TP/n
+    end
+   
+    score_list = copy(score_list[sorted_id_frob,:])
+    n_TP = 0.0;
+    for n in 1:size(score_list,1)
+        i,j = Int(score_list[n,1]), Int(score_list[n,2])
+        n_TP += contact[i,j]
+        ppv_curves_frob[n] = n_TP/n
+    end
+    return (score_list, ppv_curves_apc, ppv_curves_frob)
+end
