@@ -838,8 +838,8 @@ end
 
 function get_ppv_and_score(q,L,contact,J)
     F_temp = J_to_Frob(q,L,J)
-    F_i = sum(F_temp, dims=1)/size(F_temp,1);
-    F__ = sum(F_i)/length(F_i)
+    F_i = sum(F_temp, dims=1)/L;
+    F__ = sum(F_i)/L
     F_apc_temp = F_temp - F_i'*F_i/F__;
 
     score_list = zeros(Int(L*(L-5)/2), 4)

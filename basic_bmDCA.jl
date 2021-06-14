@@ -5,7 +5,7 @@
 """
 function init_h_J( f1::Array{Float64,1}, q::Int64, L::Int64, Meff::Float64; withdiag=false)
 	#J = rand(Float64, (q*L, q*L)) * (1.0/q^2)
-	J = rand(Float64, q*L, q*L) * (1.0/q^2)
+	J = randn(Float64, q*L, q*L) * (1.0/q^2)
 	J = J+J'	
 	for i in 1:L
 		J[km.(i,1:q,q),km.(i,1:q,q)] = zeros(q,q)
@@ -378,7 +378,9 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
 	
 	A_vec = copy(A0_vec)
     	for t in 1:T_eq
-            i = rand(1:L)
+		if(t%L==1)
+			id_set = randperm(rng,)
+		i = rand(1:L)
 	    (n_accepted, A_vec, E_old) = Metropolis_Hastings(E_old, q, L, i, A_vec, J, h)
             Auto_corr[t] += sum(kr.(A0_vec, A_vec))
         end
@@ -391,3 +393,13 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
     return Auto_corr, av_overlap, p1
 end
 
+function get_argmin_of_auto(Auto_corr, av_overlap)
+    for n in 1:size(Auto_corr,1)
+        if(Auto_corr[n]<av_overlap)
+            return n
+        end
+    end
+    if(min(Auto_corr)>av_overlap)
+	return -1
+    end
+end

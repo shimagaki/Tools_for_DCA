@@ -838,6 +838,14 @@ function get_J_h_from_xi(q::Int64, L::Int64, P::Int64, xi::Array{Float64, 2})
 	J_xi = zeros(q*L,q*L)
 	h_xi = zeros(q*L)
 	scale = 1.0/L
+	J_xi = xi' * xi * scale 
+	for i in 1:L
+		for a in 1:q
+			h[km(i,a,q)] = J_xi[km(i,a,q), km(i,a,q)]
+		end
+		J_xi[km.(i,1:q,q), km.(i,1:q,q)] = zeros(q,q)
+	end
+	"""	
 	for i in 1:L
 		for j in i:L
 			for a in 1:q
@@ -858,6 +866,7 @@ function get_J_h_from_xi(q::Int64, L::Int64, P::Int64, xi::Array{Float64, 2})
 			end
 		end
 	end
+	"""	
 	return (J_xi, h_xi)
 end
 
