@@ -378,8 +378,8 @@ function Test_Autocorrelations(L::Int64, q::Int64, T_eq::Int64, n_max::Int64, J:
 	
 	A_vec = copy(A0_vec)
     	for t in 1:T_eq
-		if(t%L==1)
-			id_set = randperm(rng,)
+		#if(t%L==1)
+		#	id_set = randperm(rng,)
 		i = rand(1:L)
 	    (n_accepted, A_vec, E_old) = Metropolis_Hastings(E_old, q, L, i, A_vec, J, h)
             Auto_corr[t] += sum(kr.(A0_vec, A_vec))
