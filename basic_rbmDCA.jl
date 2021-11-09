@@ -42,11 +42,11 @@ function E_i_hidden_diff(i::Int64, a_old::Int64, a_prop::Int64, P::Int64, L::Int
 	for j=1:L
 		if(j!=i)	
 			b = A[j]	
-			e_i += - (J[(i-1)*q+a_prop+1, (j-1)*q + b+1] * Jfiliter[(i-1)*q+a_prop+1, (j-1)*q + b+1]
-				  - J[(i-1)*q+a_old+1, (j-1)*q + b+1] * Jfiliter[(i-1)*q+a_old+1, (j-1)*q + b+1]) 
+			e_i += - (J[km(i,a_prop+1,q), km(j,b+1,q)] * Jfiliter[km(i,a_prop+1,q), km(j,b+1,q) ]
+				  - J[km(i,a_old+1,q), km(j,b+1,q)] * Jfiliter[km(i,a_old+1,q), km(j,b+1,q)]) 
 		end
 	end
-	e_i += - (h[(i-1)*q+a_prop+1] - h[(i-1)*q+a_old+1]) 
+	e_i += - (h[km(i,a_prop+1,q)] - h[km(i, a_old+1,q)]) 
 	return e_i 
 end
 
@@ -179,8 +179,8 @@ function pCDk_rbm_bm(q::Int64, L::Int64, P::Int64,
 			
 			for j in (i+1):L
 				b = A_model[j]+1 
-				f2[(i-1)*q+a, (j-1)*q+b] += scale
-				f2[(j-1)*q+b, (i-1)*q+a] += scale
+				f2[km(i,a,q), km(j,b,q)] += scale
+				f2[km(j,b,q), km(i,a,q)] += scale
 			end
 		end
 	end
@@ -297,7 +297,7 @@ function pCDk_rbm_minibatch(q::Int64, L::Int64, P::Int64,
 		
 		for i in 1:L
 			a = A_model[i]+1
-			f1[(i-1)*q+a] += scale
+			f1[km(i,a,q)] += scale
 			X_after_transition[m,i] = A_model[i]	
 			for mu in 1:P
 				psi_data[mu, km(i, X[m,i]+1, q)] += H_data[mu] * scale
@@ -306,8 +306,8 @@ function pCDk_rbm_minibatch(q::Int64, L::Int64, P::Int64,
 			
 			for j in (i+1):L
 				b = A_model[j]+1 
-				f2[(i-1)*q+a, (j-1)*q+b] += scale
-				f2[(j-1)*q+b, (i-1)*q+a] += scale
+				f2[km(i,a,q), km(j,b,q)] += scale
+				f2[km(j,b,q), km(i,a,q)] += scale
 			end
 		end
 	end
@@ -413,8 +413,8 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 			
 			for j in (i+1):L
 				b = A_model[j]+1 
-				f2[(i-1)*q+a, (j-1)*q+b] +=  w[m] * scale
-				f2[(j-1)*q+b, (i-1)*q+a] +=  w[m] * scale
+				f2[km(i,a,q), km(j,b,q)] +=  w[m] * scale
+				f2[km(j,b,q), km(i,a,q)] +=  w[m] * scale
 			end
 		end
 	end
