@@ -589,6 +589,24 @@ function gradient_ascent_l1(q::Int64, L::Int64,P::Int64,
 	        cc,cslope,froc) 
 end
 
+function gradient_ascent(q::Int64, L::Int64, lambda_h::Float64, lambda_xi::Float64, reg_h::Float64, reg_xi::Float64,  f1_data::Array{Float64,1},  f1_model::Array{Float64,1}, psi_data::Array{Float64,2},  psi_model::Array{Float64,2}, xi::Array{Float64, 2}, h::Array{Float64, 1})
+	#C1 = f2_1 - f1_1*f1_1' # C1 is only possitive.
+	C_data = f2_data - f1_data*f1_data'
+	C_model = f2_model - f1_model*f1_model'
+	
+	dh = f1_data - f1_model
+	dxi = psi_data - psi_model
+	h = h * (1.0 - reg_h) + lambda_h * dh   
+	xi = xi * (1.0 - reg_xi) + lambda_xi * dxi
+
+	c1vec = reshape(C_data, (L*L*q*q))
+	c2vec = reshape(C_model, (L*L*q*q))
+	
+	cc = Statistics.cor(c1vec,c2vec)
+	cslope = linreg(c2vec,c2vec)[2]
+	froc = LinearAlgebra.norm(c1vec - c2vec)
+	return (xi,h,sqrt(sum(dh.^2)), sqrt(sum(dxi.^2)), cc,cslope,froc) 
+end
 
 
 function gradient_ascent(q::Int64, L::Int64,P::Int64,  
