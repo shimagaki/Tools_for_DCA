@@ -29,11 +29,11 @@ function f1_f2_c2(X::Array{Int64, 2}, W::Array{Float64, 1}, q::Int64)
 	for m in 1:M
 		for i in 1:L
 			a = X[m,i]+1
-			f1[(i-1)*q+a] += W[m] * scale
+			f1[km(i,a,q)] += W[m] * scale
 			for j in (i+1):L
 				b = X[m,j]+1
-				f2[(i-1)*q+a, (j-1)*q+b] += W[m] * scale
-				f2[(j-1)*q+b, (i-1)*q+a] += W[m] * scale
+				f2[km(i,a,q), km(j,b,q)] += W[m] * scale
+				f2[km(j,b,q), km(i,a,q)] += W[m] * scale
 			end
 		end
 	end
@@ -43,8 +43,8 @@ function f1_f2_c2(X::Array{Int64, 2}, W::Array{Float64, 1}, q::Int64)
 		for j in (i+1):L
 			for a in 1:q
 				for b in 1:q
-					c2[(i-1)*q+a, (j-1)*q+b] = f2[(i-1)*q+a, (j-1)*q+b] - f1[(i-1)*q+a] * f1[(j-1)*q+b] 
-					c2[(j-1)*q+b, (i-1)*q+a] = f2[(j-1)*q+b, (i-1)*q+a] - f1[(i-1)*q+a] * f1[(j-1)*q+b]
+					c2[km(i,a,q), km(j,b,q)] = f2[km(i,a,q), km(j,b,q)] - f1[km(i,a,q)] * f1[km(j,b,q)] 
+					c2[km(j,b,q), km(i,a,q)] = f2[km(j,b,q), km(i,a,q)] - f1[km(i,a,q)] * f1[km(j,b,q)]
 				end
 			end
 		end
