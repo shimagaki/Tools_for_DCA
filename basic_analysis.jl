@@ -151,9 +151,9 @@ function basic_MSA_analysis(X,q,L)
 end
 
 function basic_MSA_analysis(X, w,q,L)
-    
+    @show size(X), "should be qL x N" 
     n_col,M = size(X)
-    Meff=sum(w)
+    @show Meff=sum(w)
     scale = 1.0/Meff
 
     Xweighted1 = zeros(size(X))
