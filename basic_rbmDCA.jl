@@ -275,7 +275,9 @@ function pCDk_rbm_minibatch(q::Int64, L::Int64, P::Int64,
 	psi_model = zeros(Float64, P, q*L)
 	n_batch = size(id_set, 1)	
 	scale = 1.0/n_batch
-	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
+	A_model = zeros(Int64, L); 
+	H_model=zeros(P); 
+	H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)	
 	H_model_mean = zeros(P) 
 	H_data = zeros(P); H_model = zeros(P)
@@ -383,7 +385,9 @@ function pCDk_rbm_weight_minbatch(q::Int64, L::Int64, P::Int64,
 	n_batch = size(id_set, 1)	
 	scale = 1.0/n_batch
 	
-	A_model = zeros(Int64, L); H_model=zeros(P); H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
+	A_model = zeros(Int64, L); 
+	H_model=zeros(P); 
+	H_data=zeros(P) #These are necessary since these are local variables and otherwise you cannot use out of for scope
 	H_data_mean = zeros(P)
 	H_model_mean = zeros(P)
 	H_data = zeros(P)

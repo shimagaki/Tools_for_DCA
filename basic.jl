@@ -14,6 +14,8 @@ softmax(x; dims=1) = exp.(x) ./ sum(exp.(x), dims=dims)
 
 linreg(x, y) = hcat(fill!(similar(x), 1), x) \ y
 
+entropy_f1(q, L, f1) = [-sum(f1[km.(i,1:q,q)] .* log.(f1[km.(i,1:q,q)]) ) for i in 1:L];
+
 """
 	f1_f2(X::Array{Int64, 2}, W::Array{Float64, 2}, q::Int64)
 	Compute frequencies of single and double sites, f1((i-1)*q+a), f2((i-1)*q+a, (j-1)*q+b).
